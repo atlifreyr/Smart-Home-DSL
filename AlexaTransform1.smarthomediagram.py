@@ -1,8 +1,3 @@
-﻿ 
- 
- 
- 
- 
 import requests
 
 # APIModel name = Alexa Skills Model
@@ -33,25 +28,25 @@ def handleDiscovery(context, event):
 					'applianceId':'device001',
 					'manufacturerName':'Philips',
 					'modelName':'Hue',
-					'version':'4.20',
-					'friendlyName':'Hue Bulb',
+					'version':'1.0',
+					'friendlyName':'Kitchen Lightbulb',
 					'friendlyDescription':'',
 					'isReachable':True,
 					'actions':[
 						'TurnOn',
-						'TurnOff',
 					]
 				},
 				{
 					'applianceId':'device002',
 					'manufacturerName':'EcoBee',
-					'modelName':'ModelName',
-					'version':'3.3',
-					'friendlyName':'Thermostat 1',
+					'modelName':'EB-STATe3-O2',
+					'version':'1.0',
+					'friendlyName':'Bathroom Thermostat',
 					'friendlyDescription':'',
 					'isReachable':True,
 					'actions':[
-						'GetTargetTemperature',
+						'SetTargetTemperature',
+						'GetTemperatureReading',
 					]
 				},
 			]
@@ -88,7 +83,7 @@ def handleControl(context, event):
 
 	if event['header']['name'] == 'TurnOnRequest' and device_id == 'device001':
 		params = {'id':'device001', 'name':'TurnOnRequest', 'action':'TurnOn', 'messageid': message_id, 'deltaPercentage' : deltaPercentage, 'deltaTemperature' : deltaTemperature, 'lockState' : lockState, 'percentageState' : percentageState, 'targetTemperature' : targetTemperature }
-		r = requests.post('http://213.220.94.21/api/Devices', data = params)
+		r = requests.post('<someURL>', data = params)
 		response = r.json() 
 		if r.status_code == 200:
 			name = 'TurnOnConfirmation'
@@ -104,16 +99,16 @@ def handleControl(context, event):
                     }
 		return { 'header': header, 'payload': payload }
 
-	if event['header']['name'] == 'TurnOffRequest' and device_id == 'device001':
-		params = {'id':'device001', 'name':'TurnOffRequest', 'action':'TurnOff', 'messageid': message_id, 'deltaPercentage' : deltaPercentage, 'deltaTemperature' : deltaTemperature, 'lockState' : lockState, 'percentageState' : percentageState, 'targetTemperature' : targetTemperature }
-		r = requests.post('http://213.220.94.21/api/Devices', data = params)
+	if event['header']['name'] == 'SetTargetTemperatureRequest' and device_id == 'device002':
+		params = {'id':'device002', 'name':'SetTargetTemperatureRequest', 'action':'SetTargetTemperature', 'messageid': message_id, 'deltaPercentage' : deltaPercentage, 'deltaTemperature' : deltaTemperature, 'lockState' : lockState, 'percentageState' : percentageState, 'targetTemperature' : targetTemperature }
+		r = requests.post('<someURL>', data = params)
 		response = r.json() 
 		if r.status_code == 200:
-			name = 'TurnOffConfirmation'
+			name = 'SetTargetTemperatureConfirmation'
 			responseMessageId = response['header']['messageId']
 			payload = response['payload']
 		else:
-			name = 'TurnOffFailed'
+			name = 'SetTargetTemperatureFailed'
 		header = {
                     "namespace":"Alexa.ConnectedHome.Control",
                     "name": name,
@@ -138,16 +133,16 @@ def handleQuery(context, event):
 	device_id = event['payload']['appliance']['applianceId']
 	message_id = event['header']['messageId']
 
-	if event['header']['name'] == 'GetTargetTemperatureRequest' and device_id == 'device002':
-		params = {'id':'device002', 'name':'GetTargetTemperatureRequest', 'action':'GetTargetTemperature', 'messageid': message_id}
-		r = requests.get('http://213.220.94.21/api/Devices', data = params)
+	if event['header']['name'] == 'GetTemperatureReadingRequest' and device_id == 'device002':
+		params = {'id':'device002', 'name':'GetTemperatureReadingRequest', 'action':'GetTemperatureReading', 'messageid': message_id}
+		r = requests.get('<someURL>', data = params)
 		response = r.json() 
 		if r.status_code == 200:
-			name = 'GetTargetTemperatureResponse'
+			name = 'GetTemperatureReadingResponse'
 			responseMessageId = response['header']['messageId']
 			payload = response['payload']
 		else:
-			name = 'GetTargetTemperatureFailed'
+			name = 'GetTemperatureReadingFailed'
 		header = {
                     "namespace":"Alexa.ConnectedHome.Query",
                     "name": name,
