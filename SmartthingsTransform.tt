@@ -1,0 +1,316 @@
+﻿<#@ template 
+inherits="Microsoft.VisualStudio.TextTemplating.VSHost.ModelingTextTransformation"#> 
+<#@ output extension=".smarthomediagram.groovy" #> 
+<#@ HomeAutomationDesigner processor="HomeAutomationDesignerDirectiveProcessor"  
+    requires="fileName='HomeAutomationDesigner2.smarthomediagram'" #>
+<#@ Assembly Name="System.Core.dll" #> 
+<#@ Import Namespace="System.Collections.Generic" #> 
+<#@ Import Namespace="System.Linq" #> 
+<# 
+    //Global variables    
+    var skilltypes = APIModel.Skills.GroupBy(k => k.MessageNamespace, v => v);
+	var appliancetypes = APIModel.Appliances.GroupBy(k => k.Type, v => v);
+#>
+
+
+// APIModel name = <#= APIModel.Name #>
+// Appliances count = <#= APIModel.Appliances.Count() #>
+// Skills count = <#= APIModel.Skills.Count() #>
+    
+
+definition(
+    name: "HTTP control/query cloud-connected devices App",
+    namespace: "MDSE",
+    author: "AP",
+    description: "Creates HTTP control/query cloud-connected devices",
+    category: "Convenience",
+    iconUrl: "https://github.com/chancsc/icon/raw/master/standard-tile%401x.png",
+    iconX2Url: "https://github.com/chancsc/icon/raw/master/standard-tile@2x.png",
+    iconX3Url: "https://github.com/chancsc/icon/raw/master/standard-tile@3x.png",
+    singleInstance: true,
+    oauth: false)
+
+
+preferences {
+}
+
+def installed() {
+	log.info "Installed HTTP control/query with settings: ${settings}"
+	initialize()
+}
+
+def updated() {
+	log.info "Updated HTTP control/query with settings: ${settings}"
+	unsubscribe()
+	initialize()
+}
+
+def initialize() {
+<#
+	foreach (var item in APIModel.Appliances)
+    {
+		var index = APIModel.Appliances.IndexOf(item)+1;
+		var uri = new Uri(item.URL);
+		var domain = uri.Host;
+		var path = uri.PathAndQuery;
+		var type = item.Type;
+        WriteLine($"\tdef uri{index} = 'http://{domain}'");
+		WriteLine($"\tdef path{index} = '{path}'");
+		WriteLine($"\tdef childId{index} = '{item.ApplianceId}'");
+		WriteLine($"\tdef existing{index} = getChildDevice(childId{index})");
+		WriteLine($"\tif (!existing{index})");
+		WriteLine("\t{");
+		WriteLine($"\t\tdef childDevice{index} = addChildDevice('MDSE', '{type}-handler-{item.ApplianceId}', childId{index}, null, [name: childId{index}, label: '{item.Name}', data: [url: uri{index}, pathStr: path{index}]])");
+		WriteLine($"\t\tchildDevice{index}.getInitialValue()");
+		WriteLine("\t}");
+    }
+#>
+}
+
+def uninstalled() {
+    removeChildDevices(getChildDevices())
+}
+
+private removeChildDevices(delete) {
+    delete.each {
+        deleteChildDevice(it.deviceNetworkId)
+    }
+}
+
+
+// ************************************************************************
+
+
+<#
+	if (appliancetypes.Select(x => x.Key).Contains("bulb"))
+    {
+        var bulbtypes = appliancetypes.Where(x => x.Key == "bulb").FirstOrDefault();
+        if (bulbtypes != null && bulbtypes.Any())
+        {
+            List<MDSE.HomeAutomationDesigner.Appliance> bulbAppliances = bulbtypes.ToList();
+            foreach (var bulbAppliance in bulbAppliances)
+            {
+				var bulbSkills = bulbAppliance.Actions.Select(x => x.Skill);
+#>
+metadata {
+	definition (name: "bulb-handler-<#=bulbAppliance.ApplianceId#>", namespace: "MDSE", author: "AP") {
+    	attribute "state", "string"
+		attribute "value", "number"
+	<#
+		foreach (var item in bulbSkills) {
+			WriteLine($"\tcommand '{item.Name}'");
+		}
+	#>
+	}
+
+	// simulator metadata
+	simulator {
+	}
+
+	// UI tile definitions
+	tiles(scale: 2) {
+		standardTile("Light Status", "device.state", width: 2, height: 2, canChangeIcon: true) {
+			state "off", label: 'Light is ${currentValue}', icon: "st.switches.light.off", backgroundColor: "#ffffff"
+			state "on", label: 'Light is ${currentValue}', icon: "st.switches.light.on", backgroundColor: "#00a0dc"
+		}
+
+<#
+	var str = $"";
+	foreach (var item in bulbSkills) {
+		str += $", '{item.Name}'";
+		WriteLine($"\t\tstandardTile('{item.Name}', 'device.state', width: 2, height: 2, canChangeIcon: true)");
+		WriteLine("\t\t{");
+		WriteLine($"\t\t\tstate 'default', label: '{item.Name}', action: '{item.Name}', icon: 'st.sonos.play-icon', backgroundColor: '#ffffff'");
+		WriteLine("\t\t}");
+	}
+#>
+		main "Light Status"
+			details (["Light Status" <#=str#>])		
+	}    
+}
+
+def getInitialValue(){
+	log.info "Executing getInitialValue"
+	executeCommand("Query", "GetInitialValue", "GetInitialValueRequest", "")
+}
+
+<#
+	foreach (var item in bulbSkills) {
+		if (item.MessageNamespace == "Control") {
+			WriteLine($"def {item.Name}(def arg)");
+			WriteLine("{");
+			WriteLine($"\texecuteCommand('{item.MessageNamespace}', '{item.Action.Name}', '{item.MessageName}', arg)");
+			WriteLine("}");
+		} else {
+			WriteLine($"def {item.Name}()");
+			WriteLine("{");
+			WriteLine($"\texecuteCommand('{item.MessageNamespace}', '{item.Action.Name}', '{item.MessageName}', '')");
+			WriteLine("}");
+		}	
+	}
+#>
+
+private void executeCommand(String method, String act, String cmd, def val){
+	def httpInfo = [
+		uri: device.getDataValue("url"),
+		path: device.getDataValue("pathStr")
+	]
+    
+	try{
+    	if (method == "Control") {
+        	httpInfo.body = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "8ABF9885-B386-443D-8ABA-01EA780199FD", value: val ]
+			log.debug httpInfo
+			httpPost(httpInfo) { resp ->
+				sendEvent(name: "state", value : resp.data.payload.state)
+				sendEvent(name: "value", value : resp.data.payload.value)
+			}
+		}
+		else {
+        	httpInfo.query = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "8ABF9885-B386-443D-8ABA-01EA780199FD" ]
+			log.debug httpInfo
+			httpGet(httpInfo) { resp ->
+				sendEvent(name: "state", value : resp.data.payload.state)
+				sendEvent(name: "value", value : resp.data.payload.value)
+			}
+		}
+	} catch (e) {
+		log.error "Error creating device: ${e}"
+	}
+}
+// ************************************************************************
+
+<#            
+			}
+        }
+                
+    }
+#>
+
+
+// ************************************************************************
+
+
+<#
+	if (appliancetypes.Select(x => x.Key).Contains("thermo"))
+    {
+        var thermotypes = appliancetypes.Where(x => x.Key == "thermo").FirstOrDefault();
+        if (thermotypes != null && thermotypes.Any())
+        {
+            List<MDSE.HomeAutomationDesigner.Appliance> thermoAppliances = thermotypes.ToList();
+            foreach (var thermoAppliance in thermoAppliances)
+            {
+				var thermoSkills = thermoAppliance.Actions.Select(x => x.Skill);
+#>
+
+metadata {
+	definition (name: "thermo-handler-<#=thermoAppliance.ApplianceId#>", namespace: "MDSE", author: "AP") {
+    	attribute "state", "string"
+		attribute "value", "number"
+	<#
+		foreach (var item in thermoSkills) {
+			WriteLine($"\tcommand '{item.Name}'");
+		}
+	#>
+		}
+
+	// simulator metadata
+	simulator {
+	}
+
+	// UI tile definitions
+	tiles(scale: 2) {
+		standardTile("Temperature", "device.value", width: 2, height: 2) {
+			state "default", label: '${currentValue}°', icon: "st.alarm.temperature.normal", backgroundColors:[
+					[value: -10, color: "#800080"],//purple
+					[value: 0, color: "#0000ff"], //blue
+					[value: 25, color: "#00ff00"],//green
+					[value: 35, color: "#ffff00"],//yellow
+					[value: 45, color: "#ffa500"],//orange			
+					[value: 60, color: "#ff0000"]//red
+			]
+		}
+
+<#
+	var str = $"";
+	foreach (var item in thermoSkills) {
+		if (item.Name.ToLower().StartsWith("set")) {
+			str += $", '{item.Name}'";
+			WriteLine($"\t\tcontrolTile('{item.Name}', 'device.value', 'slider', width: 4, height: 2, inactiveLabel: false, range:'(-100..100)')");
+			WriteLine("\t\t{");
+			WriteLine($"\t\t\tstate 'default', label: '{item.Name}', action: '{item.Name}'");
+			WriteLine("\t\t}");
+		}
+		else {
+			str += $", '{item.Name}'";
+			WriteLine($"\t\tstandardTile('{item.Name}', 'device.value', width: 2, height: 2, canChangeIcon: true)");
+			WriteLine("\t\t{");
+			WriteLine($"\t\t\tstate 'default', label: '{item.Name}', action: '{item.Name}', icon: 'st.sonos.play-icon', backgroundColor: '#ffffff'");
+			WriteLine("\t\t}");
+		}
+	}
+#>
+		main "Temperature"
+        	details (["Temperature" <#=str#>])
+		
+	}
+}
+
+def getInitialValue(){
+	log.info "Executing getInitialValue"
+	executeCommand("Query", "GetInitialValue", "GetInitialValueRequest", "")
+}
+
+<#
+	foreach (var item in thermoSkills) {
+		if (item.MessageNamespace == "Control") {
+			WriteLine($"def {item.Name}(def arg)");
+			WriteLine("{");
+			WriteLine($"\texecuteCommand('{item.MessageNamespace}', '{item.Action.Name}', '{item.MessageName}', arg)");
+			WriteLine("}");
+		} else {
+			WriteLine($"def {item.Name}()");
+			WriteLine("{");
+			WriteLine($"\texecuteCommand('{item.MessageNamespace}', '{item.Action.Name}', '{item.MessageName}', '')");
+			WriteLine("}");
+		}	
+	}
+#>
+
+private void executeCommand(String method, String act, String cmd, def val){
+	def httpInfo = [
+		uri: device.getDataValue("url"),
+		path: device.getDataValue("pathStr")
+	]
+    
+	try{
+    	if (method == "Control") {
+        	httpInfo.body = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "8ABF9885-B386-443D-8ABA-01EA780199FD", value: val]
+			log.debug httpInfo
+			httpPost(httpInfo) { resp ->
+				sendEvent(name: "state", value : resp.data.payload.state)
+				sendEvent(name: "value", value : resp.data.payload.value)
+			}
+		}
+		else {
+        	httpInfo.query = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "8ABF9885-B386-443D-8ABA-01EA780199FD"]
+			log.debug httpInfo
+			httpGet(httpInfo) { resp ->
+				sendEvent(name: "state", value : resp.data.payload.state)
+				sendEvent(name: "value", value : resp.data.payload.value)
+			}
+		}
+	} catch (e) {
+		log.error "Error creating device: ${e}"
+	}
+}
+
+
+
+// ************************************************************************
+
+<#            
+			}
+        }
+                
+    }
+#>

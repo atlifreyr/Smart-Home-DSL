@@ -1,0 +1,168 @@
+﻿<#@ template 
+inherits="Microsoft.VisualStudio.TextTemplating.VSHost.ModelingTextTransformation"#> 
+<#@ output extension=".smarthomediagram.py" #> 
+<#@ HomeAutomationDesigner processor="HomeAutomationDesignerDirectiveProcessor"  
+    requires="fileName='HomeAutomationDesigner1.smarthomediagram'" #>
+<#@ Assembly Name="System.Core.dll" #> 
+<#@ Import Namespace="System.Collections.Generic" #> 
+<#@ Import Namespace="System.Linq" #> 
+<# 
+    //Global variables    
+    var skilltypes = APIModel.Skills.GroupBy(k => k.MessageNamespace, v => v);
+#>
+import requests
+
+# APIModel name = <#= APIModel.Name #>
+# Appliances count = <#= APIModel.Appliances.Count() #>
+# Skills count = <#= APIModel.Skills.Count() #>
+    
+<#
+    //Lambda Handler
+    WriteLine("def lambda_handler(event, context):");
+    WriteLine("\taccess_token = event['payload']['accessToken']");
+    WriteLine($"\tif event['header']['namespace'] == 'Alexa.ConnectedHome.Discovery':");
+    WriteLine($"\t\treturn handleDiscovery(context, event)");
+    foreach (var item in skilltypes)
+    {
+        WriteLine($"\tif event['header']['namespace'] == 'Alexa.ConnectedHome.{item.Key}':");
+        WriteLine($"\t\treturn handle{item.Key}(context, event)");
+    }
+#>
+
+<#  
+    //Generate Discovery Handler
+    WriteLine("def handleDiscovery(context, event):");
+    WriteLine("\tpayload = ''");
+    WriteLine("\theader = ''");
+    // Check request name
+    WriteLine("\tif event['header']['name'] == 'DiscoverAppliancesRequest':");
+    WriteLine("\t\theader = {");
+    WriteLine("\t\t\t'namespace':'Alexa.ConnectedHome.Discovery',");
+    WriteLine("\t\t\t'name':'DiscoverAppliancesResponse',");
+    WriteLine("\t\t\t'payloadVersion':'2'");
+    WriteLine("\t\t}");
+    WriteLine("\t\tpayload = {");
+    WriteLine("\t\t\t'discoveredAppliances': [");
+    foreach (var device in APIModel.Appliances) {
+        WriteLine("\t\t\t\t{");
+        WriteLine($"\t\t\t\t\t'applianceId':'{device.ApplianceId.ToString()}',");
+        WriteLine($"\t\t\t\t\t'manufacturerName':'{device.ManufacturerName}',");
+        WriteLine($"\t\t\t\t\t'modelName':'{device.ModelName}',");
+        WriteLine($"\t\t\t\t\t'version':'{device.Version}',");
+        WriteLine($"\t\t\t\t\t'friendlyName':'{device.FriendlyName}',");
+        WriteLine($"\t\t\t\t\t'friendlyDescription':'{device.FriendlyDescription}',");
+        //TODO: Should we use isReachable? 
+        WriteLine("\t\t\t\t\t'isReachable':True,");
+        WriteLine("\t\t\t\t\t'actions':[");
+        foreach (var action in device.Actions) {
+            WriteLine($"\t\t\t\t\t\t'{action.Name}',");
+        }
+        WriteLine("\t\t\t\t\t]");
+        WriteLine("\t\t\t\t},");
+    }
+    // Loop through appliances
+    WriteLine("\t\t\t]");
+    WriteLine("\t\t}");
+    WriteLine("\treturn { 'header': header, 'payload': payload }");
+
+    //Generate Handler Calls for query and control
+    foreach(var item in skilltypes)
+    {
+        WriteLine("");
+        WriteLine($"def handle{item.Key}(context, event):");
+        WriteLine("\tpayload = {}");
+        WriteLine("\tname = ''");
+        WriteLine("\tresponseMessageId = ''");
+        WriteLine("\tdevice_id = event['payload']['appliance']['applianceId']");
+        WriteLine("\tmessage_id = event['header']['messageId']");
+
+        if(item.Key.ToString() == "Control")
+        {
+            WriteLine("");
+            WriteLine("\tdeltaPercentage = ''");
+            WriteLine("\tdeltaTemperature = ''");
+            WriteLine("\tlockState = ''");
+            WriteLine("\tpercentageState = ''");
+            WriteLine("\ttargetTemperature = ''");
+            WriteLine("\t# DecrementPercentageRequest and IncrementPercentageRequest");
+            WriteLine("\tif 'deltaPercentage' in event['payload']:");
+            WriteLine("\t\tdeltaPercentage = event['payload']['deltaPercentage']['value']");
+            WriteLine("\t# IncrementTargetTemperatureRequest");
+            WriteLine("\tif 'deltaTemperature' in event['payload']:");
+            WriteLine("\t\tdeltaTemperature = event['payload']['deltaTemperature']['value']");
+            WriteLine("\t# SetLockStateRequest");
+            WriteLine("\tif 'lockState' in event['payload']:");
+            WriteLine("\t\tlockState = event['payload']['lockState']");
+            WriteLine("\t# SetPercentageRequest");
+            WriteLine("\tif 'percentageState' in event['payload']:");
+            WriteLine("\t\tpercentageState = event['payload']['percentageState']['value']");
+            WriteLine("\t# SetTargetTemperatureRequest");
+            WriteLine("\tif 'targetTemperature' in event['payload']:");
+            WriteLine("\t\ttargetTemperature = event['payload']['targetTemperature']['value']");
+            foreach(var valueG in item)
+            {
+                WriteLine("");
+                WriteLine($"\tif event['header']['name'] == '{valueG.MessageName}' and device_id == '{valueG.Action.Appliance.ApplianceId}':");
+                WriteLine("\t\tparams = {'id':'"+valueG.Action.Appliance.ApplianceId + "', 'name':'"+valueG.MessageName+"', 'action':'"+valueG.Action.Name + "', 'messageid': message_id, 'deltaPercentage' : deltaPercentage, 'deltaTemperature' : deltaTemperature, 'lockState' : lockState, 'percentageState' : percentageState, 'targetTemperature' : targetTemperature }");
+                WriteLine($"\t\tr = requests.post('{valueG.Action.Appliance.URL}', data = params)");
+
+                string temoMessageName = valueG.MessageName.Substring(0, valueG.MessageName.Length - 7);
+
+                WriteLine("\t\tresponse = r.json() ");
+                WriteLine("\t\tif r.status_code == 200:");
+                WriteLine($"\t\t\tname = '{temoMessageName}Confirmation'");
+                WriteLine("\t\t\tresponseMessageId = response['header']['messageId']");
+                WriteLine("\t\t\tpayload = response['payload']");
+                WriteLine("\t\telse:");
+                WriteLine($"\t\t\tname = '{temoMessageName}Failed'");
+                Write($"\t\t");
+                string response = @"header = {
+                    ""namespace"":""Alexa.ConnectedHome." + item.Key + @""",
+                    ""name"": name,
+                    ""payloadVersion"":""2"",
+                    ""messageId"": responseMessageId
+                    }";
+                WriteLine(response);
+                WriteLine("\t\treturn { 'header': header, 'payload': payload }");
+            }
+            WriteLine("");
+            WriteLine("\t# If none of the if statements above have run return error");
+            WriteLine("\theader = {");
+            WriteLine($"\t\t'namespace':'Alexa.ConnectedHome.{item.Key}',");
+            WriteLine("\t\t'name':'Unknown command or command not supported by targeted device',");
+            WriteLine("\t\t'payloadVersion':'2'");
+            WriteLine("\t}");
+            WriteLine("\tpayload = {}");
+            WriteLine("\treturn { 'header': header, 'payload': payload }");
+        }
+        else if(item.Key.ToString() == "Query")
+        {
+            foreach(var valueG in item)
+            {
+                WriteLine("");
+                WriteLine($"\tif event['header']['name'] == '{valueG.MessageName}' and device_id == '{valueG.Action.Appliance.ApplianceId}':");
+                WriteLine("\t\tparams = {'id':'"+valueG.Action.Appliance.ApplianceId + "', 'name':'"+valueG.MessageName+"', 'action':'"+valueG.Action.Name + "', 'messageid': message_id}");
+                WriteLine($"\t\tr = requests.get('{valueG.Action.Appliance.URL}', data = params)");
+
+                string temoMessageName = valueG.MessageName.Substring(0, valueG.MessageName.Length - 7);
+
+                WriteLine("\t\tresponse = r.json() ");
+                WriteLine("\t\tif r.status_code == 200:");
+                WriteLine($"\t\t\tname = '{temoMessageName}Response'");
+                WriteLine("\t\t\tresponseMessageId = response['header']['messageId']");
+                WriteLine("\t\t\tpayload = response['payload']");
+                WriteLine("\t\telse:");
+                WriteLine($"\t\t\tname = '{temoMessageName}Failed'");
+                Write($"\t\t");
+                string response = @"header = {
+                    ""namespace"":""Alexa.ConnectedHome." + item.Key + @""",
+                    ""name"": name,
+                    ""payloadVersion"":""2"",
+                    ""messageId"": responseMessageId
+                    }";
+                WriteLine(response);
+                WriteLine("\t\treturn { 'header': header, 'payload': payload }");
+            }
+        }
+    }
+#>
