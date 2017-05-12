@@ -8,6 +8,7 @@
 The code examples are generated from the following diagram:
 ![alt text](https://raw.githubusercontent.com/atlifreyr/Smart-Home-DSL/master/diagram.png)
 
-```html
-<iframe width="420" height="315" src="http://www.youtube.com/embed/DHOtL3rvMak" frameborder="0" allowfullscreen></iframe>
-```
+The following video illustrates how the diagram instance above can be created using our DSL in Visual Studio 2015
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=DHOtL3rvMak
+" target="_blank"><img src="http://img.youtube.com/vi/DHOtL3rvMak/0.jpg" 
+alt="DSL Demo" width="240" height="180" border="10" /></a>
