@@ -118,7 +118,7 @@ private void executeCommand(String method, String act, String cmd, def val){
     
     try{
     	if (method == "Control") {
-        	httpInfo.body = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "8ABF9885-B386-443D-8ABA-01EA780199FD", value: val ]
+        	httpInfo.body = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "5baa4121-2588-439e-baf1-004613d12249", value: val ]
             log.debug httpInfo
             httpPost(httpInfo) { resp ->
                 sendEvent(name: "state", value : resp.data.payload.state)
@@ -126,7 +126,7 @@ private void executeCommand(String method, String act, String cmd, def val){
             }
         }
         else {
-        	httpInfo.query = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "8ABF9885-B386-443D-8ABA-01EA780199FD" ]
+        	httpInfo.query = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "147fb6fd-6be4-430c-b2ef-9dbb215984d7"]
             log.debug httpInfo
             httpGet(httpInfo) { resp ->
                 sendEvent(name: "state", value : resp.data.payload.state)
@@ -202,7 +202,7 @@ private void executeCommand(String method, String act, String cmd, def val){
     
     try{
     	if (method == "Control") {
-        	httpInfo.body = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "8ABF9885-B386-443D-8ABA-01EA780199FD", value: val ]
+        	httpInfo.body = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "9e3f81ed-4af4-4ade-9726-c6e5b08e8d87", value: val ]
             log.debug httpInfo
             httpPost(httpInfo) { resp ->
                 sendEvent(name: "state", value : resp.data.payload.state)
@@ -210,7 +210,7 @@ private void executeCommand(String method, String act, String cmd, def val){
             }
         }
         else {
-        	httpInfo.query = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "8ABF9885-B386-443D-8ABA-01EA780199FD" ]
+        	httpInfo.query = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "9b9aa950-20f1-41ad-99ee-e2d2b795fbbc"]
             log.debug httpInfo
             httpGet(httpInfo) { resp ->
                 sendEvent(name: "state", value : resp.data.payload.state)
