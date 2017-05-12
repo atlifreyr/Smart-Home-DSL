@@ -7,3 +7,7 @@
 
 The code examples are generated from the following diagram:
 ![alt text](https://raw.githubusercontent.com/atlifreyr/Smart-Home-DSL/master/diagram.png)
+
+```html
+<iframe width="420" height="315" src="http://www.youtube.com/embed/DHOtL3rvMak" frameborder="0" allowfullscreen></iframe>
+```
