@@ -1,4 +1,4 @@
-﻿<#@ template 
+<#@ template 
 inherits="Microsoft.VisualStudio.TextTemplating.VSHost.ModelingTextTransformation"#> 
 <#@ output extension=".smarthomediagram.py" #> 
 <#@ HomeAutomationDesigner processor="HomeAutomationDesignerDirectiveProcessor"  
@@ -22,10 +22,11 @@ import requests
     WriteLine("\taccess_token = event['payload']['accessToken']");
     WriteLine($"\tif event['header']['namespace'] == 'Alexa.ConnectedHome.Discovery':");
     WriteLine($"\t\treturn handleDiscovery(context, event)");
-    foreach (var item in skilltypes)
+    foreach (var item in APIModel.Appliances)
     {
-        WriteLine($"\tif event['header']['namespace'] == 'Alexa.ConnectedHome.{item.Key}':");
-        WriteLine($"\t\treturn handle{item.Key}(context, event)");
+		var index = APIModel.Appliances.IndexOf(item)+1;
+        WriteLine($"\tif event['payload']['appliance']['applianceId'] == '{item.ApplianceId.ToString()}':");
+        WriteLine($"\t\treturn handleDevice{index}(context, event)");
     }
 #>
 
@@ -65,18 +66,23 @@ import requests
     WriteLine("\t\t}");
     WriteLine("\treturn { 'header': header, 'payload': payload }");
 
-    //Generate Handler Calls for query and control
-    foreach(var item in skilltypes)
+    //Generate Handlers for query and control
+    foreach (var item in APIModel.Appliances)
     {
+		var index = APIModel.Appliances.IndexOf(item)+1;
+		var type = item.Type.ToLower();
+		var skills = item.Actions.Select(k => k.Skill);
+		bool hasControl = skills.Where(x => x.MessageNamespace == "Control").Any();
+		bool hasQuery = skills.Where(x => x.MessageNamespace == "Query").Any();
         WriteLine("");
-        WriteLine($"def handle{item.Key}(context, event):");
+        WriteLine($"def handleDevice{index}(context, event):");
         WriteLine("\tpayload = {}");
         WriteLine("\tname = ''");
         WriteLine("\tresponseMessageId = ''");
         WriteLine("\tdevice_id = event['payload']['appliance']['applianceId']");
         WriteLine("\tmessage_id = event['header']['messageId']");
 
-        if(item.Key.ToString() == "Control")
+        if(hasControl)
         {
             WriteLine("");
             WriteLine("\tdeltaPercentage = ''");
@@ -99,10 +105,10 @@ import requests
             WriteLine("\t# SetTargetTemperatureRequest");
             WriteLine("\tif 'targetTemperature' in event['payload']:");
             WriteLine("\t\ttargetTemperature = event['payload']['targetTemperature']['value']");
-            foreach(var valueG in item)
+            foreach(var valueG in skills.Where(x => x.MessageNamespace == "Control"))
             {
                 WriteLine("");
-                WriteLine($"\tif event['header']['name'] == '{valueG.MessageName}' and device_id == '{valueG.Action.Appliance.ApplianceId}':");
+                WriteLine($"\tif event['header']['name'] == '{valueG.MessageName}':");
                 WriteLine("\t\tparams = {'id':'"+valueG.Action.Appliance.ApplianceId + "', 'name':'"+valueG.MessageName+"', 'action':'"+valueG.Action.Name + "', 'messageid': message_id, 'deltaPercentage' : deltaPercentage, 'deltaTemperature' : deltaTemperature, 'lockState' : lockState, 'percentageState' : percentageState, 'targetTemperature' : targetTemperature }");
                 WriteLine($"\t\tr = requests.post('{valueG.Action.Appliance.URL}', data = params)");
 
@@ -117,7 +123,7 @@ import requests
                 WriteLine($"\t\t\tname = '{temoMessageName}Failed'");
                 Write($"\t\t");
                 string response = @"header = {
-                    ""namespace"":""Alexa.ConnectedHome." + item.Key + @""",
+                    ""namespace"":""Alexa.ConnectedHome." + valueG.MessageNamespace + @""",
                     ""name"": name,
                     ""payloadVersion"":""2"",
                     ""messageId"": responseMessageId
@@ -126,21 +132,13 @@ import requests
                 WriteLine("\t\treturn { 'header': header, 'payload': payload }");
             }
             WriteLine("");
-            WriteLine("\t# If none of the if statements above have run return error");
-            WriteLine("\theader = {");
-            WriteLine($"\t\t'namespace':'Alexa.ConnectedHome.{item.Key}',");
-            WriteLine("\t\t'name':'Unknown command or command not supported by targeted device',");
-            WriteLine("\t\t'payloadVersion':'2'");
-            WriteLine("\t}");
-            WriteLine("\tpayload = {}");
-            WriteLine("\treturn { 'header': header, 'payload': payload }");
         }
-        else if(item.Key.ToString() == "Query")
+        if(hasQuery)
         {
-            foreach(var valueG in item)
+            foreach(var valueG in skills.Where(x => x.MessageNamespace == "Query"))
             {
                 WriteLine("");
-                WriteLine($"\tif event['header']['name'] == '{valueG.MessageName}' and device_id == '{valueG.Action.Appliance.ApplianceId}':");
+                WriteLine($"\tif event['header']['name'] == '{valueG.MessageName}':");
                 WriteLine("\t\tparams = {'id':'"+valueG.Action.Appliance.ApplianceId + "', 'name':'"+valueG.MessageName+"', 'action':'"+valueG.Action.Name + "', 'messageid': message_id}");
                 WriteLine($"\t\tr = requests.get('{valueG.Action.Appliance.URL}', data = params)");
 
@@ -155,7 +153,7 @@ import requests
                 WriteLine($"\t\t\tname = '{temoMessageName}Failed'");
                 Write($"\t\t");
                 string response = @"header = {
-                    ""namespace"":""Alexa.ConnectedHome." + item.Key + @""",
+                    ""namespace"":""Alexa.ConnectedHome." + valueG.MessageNamespace + @""",
                     ""name"": name,
                     ""payloadVersion"":""2"",
                     ""messageId"": responseMessageId
