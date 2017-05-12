@@ -1,17 +1,13 @@
 import requests
-
-# APIModel name = Alexa Skills Model
-# Appliances count = 2
-# Skills count = 3
     
 def lambda_handler(event, context):
 	access_token = event['payload']['accessToken']
 	if event['header']['namespace'] == 'Alexa.ConnectedHome.Discovery':
 		return handleDiscovery(context, event)
-	if event['header']['namespace'] == 'Alexa.ConnectedHome.Control':
-		return handleControl(context, event)
-	if event['header']['namespace'] == 'Alexa.ConnectedHome.Query':
-		return handleQuery(context, event)
+	if event['payload']['appliance']['applianceId'] == '001':
+		return handleDevice1(context, event)
+	if event['payload']['appliance']['applianceId'] == '002':
+		return handleDevice2(context, event)
 
 def handleDiscovery(context, event):
 	payload = ''
@@ -25,11 +21,11 @@ def handleDiscovery(context, event):
 		payload = {
 			'discoveredAppliances': [
 				{
-					'applianceId':'device001',
+					'applianceId':'001',
 					'manufacturerName':'Philips',
 					'modelName':'Hue',
-					'version':'1.0',
-					'friendlyName':'Kitchen Lightbulb',
+					'version':'2.2',
+					'friendlyName':'',
 					'friendlyDescription':'',
 					'isReachable':True,
 					'actions':[
@@ -37,11 +33,11 @@ def handleDiscovery(context, event):
 					]
 				},
 				{
-					'applianceId':'device002',
+					'applianceId':'002',
 					'manufacturerName':'EcoBee',
-					'modelName':'EB-STATe3-O2',
-					'version':'1.0',
-					'friendlyName':'Bathroom Thermostat',
+					'modelName':'Thermostat',
+					'version':'3.0',
+					'friendlyName':'',
 					'friendlyDescription':'',
 					'isReachable':True,
 					'actions':[
@@ -53,7 +49,7 @@ def handleDiscovery(context, event):
 		}
 	return { 'header': header, 'payload': payload }
 
-def handleControl(context, event):
+def handleDevice1(context, event):
 	payload = {}
 	name = ''
 	responseMessageId = ''
@@ -81,9 +77,9 @@ def handleControl(context, event):
 	if 'targetTemperature' in event['payload']:
 		targetTemperature = event['payload']['targetTemperature']['value']
 
-	if event['header']['name'] == 'TurnOnRequest' and device_id == 'device001':
-		params = {'id':'device001', 'name':'TurnOnRequest', 'action':'TurnOn', 'messageid': message_id, 'deltaPercentage' : deltaPercentage, 'deltaTemperature' : deltaTemperature, 'lockState' : lockState, 'percentageState' : percentageState, 'targetTemperature' : targetTemperature }
-		r = requests.post('<someURL>', data = params)
+	if event['header']['name'] == 'TurnOnRequest':
+		params = {'id':'001', 'name':'TurnOnRequest', 'action':'TurnOn', 'messageid': message_id, 'deltaPercentage' : deltaPercentage, 'deltaTemperature' : deltaTemperature, 'lockState' : lockState, 'percentageState' : percentageState, 'targetTemperature' : targetTemperature }
+		r = requests.post('http://domain.test', data = params)
 		response = r.json() 
 		if r.status_code == 200:
 			name = 'TurnOnConfirmation'
@@ -99,9 +95,38 @@ def handleControl(context, event):
                     }
 		return { 'header': header, 'payload': payload }
 
-	if event['header']['name'] == 'SetTargetTemperatureRequest' and device_id == 'device002':
-		params = {'id':'device002', 'name':'SetTargetTemperatureRequest', 'action':'SetTargetTemperature', 'messageid': message_id, 'deltaPercentage' : deltaPercentage, 'deltaTemperature' : deltaTemperature, 'lockState' : lockState, 'percentageState' : percentageState, 'targetTemperature' : targetTemperature }
-		r = requests.post('<someURL>', data = params)
+
+def handleDevice2(context, event):
+	payload = {}
+	name = ''
+	responseMessageId = ''
+	device_id = event['payload']['appliance']['applianceId']
+	message_id = event['header']['messageId']
+
+	deltaPercentage = ''
+	deltaTemperature = ''
+	lockState = ''
+	percentageState = ''
+	targetTemperature = ''
+	# DecrementPercentageRequest and IncrementPercentageRequest
+	if 'deltaPercentage' in event['payload']:
+		deltaPercentage = event['payload']['deltaPercentage']['value']
+	# IncrementTargetTemperatureRequest
+	if 'deltaTemperature' in event['payload']:
+		deltaTemperature = event['payload']['deltaTemperature']['value']
+	# SetLockStateRequest
+	if 'lockState' in event['payload']:
+		lockState = event['payload']['lockState']
+	# SetPercentageRequest
+	if 'percentageState' in event['payload']:
+		percentageState = event['payload']['percentageState']['value']
+	# SetTargetTemperatureRequest
+	if 'targetTemperature' in event['payload']:
+		targetTemperature = event['payload']['targetTemperature']['value']
+
+	if event['header']['name'] == 'SetTargetTemperatureRequest':
+		params = {'id':'002', 'name':'SetTargetTemperatureRequest', 'action':'SetTargetTemperature', 'messageid': message_id, 'deltaPercentage' : deltaPercentage, 'deltaTemperature' : deltaTemperature, 'lockState' : lockState, 'percentageState' : percentageState, 'targetTemperature' : targetTemperature }
+		r = requests.post('http://domain.test', data = params)
 		response = r.json() 
 		if r.status_code == 200:
 			name = 'SetTargetTemperatureConfirmation'
@@ -117,25 +142,10 @@ def handleControl(context, event):
                     }
 		return { 'header': header, 'payload': payload }
 
-	# If none of the if statements above have run return error
-	header = {
-		'namespace':'Alexa.ConnectedHome.Control',
-		'name':'Unknown command or command not supported by targeted device',
-		'payloadVersion':'2'
-	}
-	payload = {}
-	return { 'header': header, 'payload': payload }
 
-def handleQuery(context, event):
-	payload = {}
-	name = ''
-	responseMessageId = ''
-	device_id = event['payload']['appliance']['applianceId']
-	message_id = event['header']['messageId']
-
-	if event['header']['name'] == 'GetTemperatureReadingRequest' and device_id == 'device002':
-		params = {'id':'device002', 'name':'GetTemperatureReadingRequest', 'action':'GetTemperatureReading', 'messageid': message_id}
-		r = requests.get('<someURL>', data = params)
+	if event['header']['name'] == 'GetTemperatureReadingRequest':
+		params = {'id':'002', 'name':'GetTemperatureReadingRequest', 'action':'GetTemperatureReading', 'messageid': message_id}
+		r = requests.get('http://domain.test', data = params)
 		response = r.json() 
 		if r.status_code == 200:
 			name = 'GetTemperatureReadingResponse'
