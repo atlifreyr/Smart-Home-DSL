@@ -203,7 +203,7 @@ private void executeCommand(String method, String act, String cmd, def val){
     
     try{
     	if (method == "Control") {
-        	httpInfo.body = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "8ABF9885-B386-443D-8ABA-01EA780199FD", value: val ]
+        	httpInfo.body = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "<#=Guid.NewGuid().ToString()#>", value: val ]
             log.debug httpInfo
             httpPost(httpInfo) { resp ->
                 sendEvent(name: "state", value : resp.data.payload.state)
@@ -211,7 +211,7 @@ private void executeCommand(String method, String act, String cmd, def val){
             }
         }
         else {
-        	httpInfo.query = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "8ABF9885-B386-443D-8ABA-01EA780199FD" ]
+        	httpInfo.query = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "<#=Guid.NewGuid().ToString()#>"]
             log.debug httpInfo
             httpGet(httpInfo) { resp ->
                 sendEvent(name: "state", value : resp.data.payload.state)
