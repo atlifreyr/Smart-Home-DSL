@@ -1,4 +1,4 @@
-﻿ 
+ 
  
  
  
@@ -6,7 +6,7 @@
 
 
 // APIModel name = Alexa Skills Model
-// Appliances count = 3
+// Appliances count = 2
 // Skills count = 3
     
 
@@ -38,32 +38,23 @@ def updated() {
 }
 
 def initialize() {
-	def uri1 = 'http://213.220.94.21'
-	def path1 = '/api/Devices'
-	def childId1 = 'device001'
+	def uri1 = 'http://domain.test'
+	def path1 = '/'
+	def childId1 = '001'
 	def existing1 = getChildDevice(childId1)
 	if (!existing1)
 	{
-		def childDevice1 = addChildDevice('MDSE', 'bulb-handler-device001', childId1, null, [name: childId1, label: 'Bulb 1', data: [url: uri1, pathStr: path1]])
+		def childDevice1 = addChildDevice('MDSE', 'device1 handler', childId1, null, [name: childId1, label: 'Kitchen Light', data: [url: uri1, pathStr: path1]])
 		childDevice1.getInitialValue()
 	}
-	def uri2 = 'http://213.220.94.21'
-	def path2 = '/api/Devices'
-	def childId2 = 'device002'
+	def uri2 = 'http://domain.test'
+	def path2 = '/'
+	def childId2 = '002'
 	def existing2 = getChildDevice(childId2)
 	if (!existing2)
 	{
-		def childDevice2 = addChildDevice('MDSE', 'thermo-handler-device002', childId2, null, [name: childId2, label: 'Thermo 1', data: [url: uri2, pathStr: path2]])
+		def childDevice2 = addChildDevice('MDSE', 'device2 handler', childId2, null, [name: childId2, label: 'Bathroom Thermostat', data: [url: uri2, pathStr: path2]])
 		childDevice2.getInitialValue()
-	}
-	def uri3 = 'http://213.220.94.21'
-	def path3 = '/api/Devices'
-	def childId3 = 'device003'
-	def existing3 = getChildDevice(childId3)
-	if (!existing3)
-	{
-		def childDevice3 = addChildDevice('MDSE', 'thermo-handler-device003', childId3, null, [name: childId3, label: 'Thermo 2', data: [url: uri3, pathStr: path3]])
-		childDevice3.getInitialValue()
 	}
 }
 
@@ -78,15 +69,14 @@ private removeChildDevices(delete) {
 }
 
 
-// ************************************************************************
-
+// ******************************************** Handler for Kitchen Light *******************************************************
 
 metadata {
-	definition (name: "bulb-handler-device001", namespace: "MDSE", author: "AP") {
+	definition (name: "device1 handler", namespace: "MDSE", author: "AP") {
     	attribute "state", "string"
 		attribute "value", "number"
-		command 'TurnOnSkill'
-	}
+		command 'TurnOnKitchenLight'
+		}
 
 	// simulator metadata
 	simulator {
@@ -94,17 +84,19 @@ metadata {
 
 	// UI tile definitions
 	tiles(scale: 2) {
-		standardTile("Light Status", "device.state", width: 2, height: 2, canChangeIcon: true) {
-			state "off", label: 'Light is ${currentValue}', icon: "st.switches.light.off", backgroundColor: "#ffffff"
-			state "on", label: 'Light is ${currentValue}', icon: "st.switches.light.on", backgroundColor: "#00a0dc"
-		}
+		standardTile("MainTile", "device.state", width: 2, height: 2, canChangeIcon: true) {
+            state "off", label: 'Light is ${currentValue}', icon: "st.switches.light.off", backgroundColor: "#ffffff"
+            state "on", label: 'Light is ${currentValue}', icon: "st.switches.light.on", backgroundColor: "#00a0dc"
+        }
 
-		standardTile('TurnOnSkill', 'device.state', width: 2, height: 2, canChangeIcon: true)
-		{
-			state 'default', label: 'TurnOnSkill', action: 'TurnOnSkill', icon: 'st.sonos.play-icon', backgroundColor: '#ffffff'
-		}
-		main "Light Status"
-			details (["Light Status" , 'TurnOnSkill'])		
+
+		standardTile('TurnOnKitchenLight', 'device.state', width: 2, height: 2, canChangeIcon: true)
+	{
+		state 'default', label: 'TurnOnKitchenLight', action: 'TurnOnKitchenLight', icon: 'st.sonos.play-icon', backgroundColor: '#ffffff'
+	}
+        main "MainTile"
+        	details (["MainTile" , 'TurnOnKitchenLight'])
+		
 	}    
 }
 
@@ -113,60 +105,57 @@ def getInitialValue(){
 	executeCommand("Query", "GetInitialValue", "GetInitialValueRequest", "")
 }
 
-def TurnOnSkill(def arg)
-{
-	executeCommand('Control', 'TurnOn', 'TurnOnRequest', arg)
-}
+	def TurnOnKitchenLight(def arg)
+	{
+		executeCommand('Control', 'TurnOn', 'TurnOnRequest', arg)
+	}
 
 private void executeCommand(String method, String act, String cmd, def val){
-	def httpInfo = [
-		uri: device.getDataValue("url"),
-		path: device.getDataValue("pathStr")
+    def httpInfo = [
+        uri: device.getDataValue("url"),
+        path: device.getDataValue("pathStr")
 	]
     
-	try{
+    try{
     	if (method == "Control") {
         	httpInfo.body = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "8ABF9885-B386-443D-8ABA-01EA780199FD", value: val ]
-			log.debug httpInfo
-			httpPost(httpInfo) { resp ->
-				sendEvent(name: "state", value : resp.data.payload.state)
-				sendEvent(name: "value", value : resp.data.payload.value)
-			}
-		}
-		else {
+            log.debug httpInfo
+            httpPost(httpInfo) { resp ->
+                sendEvent(name: "state", value : resp.data.payload.state)
+                sendEvent(name: "value", value : resp.data.payload.value)
+            }
+        }
+        else {
         	httpInfo.query = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "8ABF9885-B386-443D-8ABA-01EA780199FD" ]
-			log.debug httpInfo
-			httpGet(httpInfo) { resp ->
-				sendEvent(name: "state", value : resp.data.payload.state)
-				sendEvent(name: "value", value : resp.data.payload.value)
-			}
-		}
-	} catch (e) {
-		log.error "Error creating device: ${e}"
-	}
+            log.debug httpInfo
+            httpGet(httpInfo) { resp ->
+                sendEvent(name: "state", value : resp.data.payload.state)
+                sendEvent(name: "value", value : resp.data.payload.value)
+            }
+        }
+    } catch (e) {
+        log.error "Error creating device: ${e}"
+    }
 }
-// ************************************************************************
 
-
-
-// ************************************************************************
-
-
+// ******************************************** Handler for Bathroom Thermostat *******************************************************
 
 metadata {
-	definition (name: "thermo-handler-device002", namespace: "MDSE", author: "AP") {
+	definition (name: "device2 handler", namespace: "MDSE", author: "AP") {
     	attribute "state", "string"
 		attribute "value", "number"
-		command 'gettemperaturereadingSkill'
+		command 'SetBathroomTemp'
+	command 'GetBathroomTemp'
 		}
 
 	// simulator metadata
 	simulator {
 	}
 
+
 	// UI tile definitions
 	tiles(scale: 2) {
-		standardTile("Temperature", "device.value", width: 2, height: 2) {
+		standardTile("MainTile", "device.value", width: 2, height: 2) {
 			state "default", label: '${currentValue}°', icon: "st.alarm.temperature.normal", backgroundColors:[
 					[value: -10, color: "#800080"],//purple
 					[value: 0, color: "#0000ff"], //blue
@@ -177,14 +166,18 @@ metadata {
 			]
 		}
 
-		standardTile('gettemperaturereadingSkill', 'device.value', width: 2, height: 2, canChangeIcon: true)
-		{
-			state 'default', label: 'gettemperaturereadingSkill', action: 'gettemperaturereadingSkill', icon: 'st.sonos.play-icon', backgroundColor: '#ffffff'
-		}
-		main "Temperature"
-        	details (["Temperature" , 'gettemperaturereadingSkill'])
-		
+		controlTile('SetBathroomTemp', 'device.value', 'slider', width: 4, height: 2, inactiveLabel: false, range:'(-100..100)')
+	{
+		state 'default', label: 'SetBathroomTemp', action: 'SetBathroomTemp'
 	}
+	standardTile('GetBathroomTemp', 'device.value', width: 2, height: 2, canChangeIcon: true)
+	{
+		state 'default', label: 'GetBathroomTemp', action: 'GetBathroomTemp', icon: 'st.sonos.play-icon', backgroundColor: '#ffffff'
+	}
+        main "MainTile"
+        	details (["MainTile" , 'SetBathroomTemp', 'GetBathroomTemp'])
+		
+	}    
 }
 
 def getInitialValue(){
@@ -192,117 +185,39 @@ def getInitialValue(){
 	executeCommand("Query", "GetInitialValue", "GetInitialValueRequest", "")
 }
 
-def gettemperaturereadingSkill()
-{
-	executeCommand('Query', 'gettemperaturereading', 'gettemperaturereadingRequest', '')
-}
+	def SetBathroomTemp(def arg)
+	{
+		executeCommand('Control', 'SetTargetTemperature', 'SetTargetTemperatureRequest', arg)
+	}
+	def GetBathroomTemp()
+	{
+		executeCommand('Query', 'GetTemperatureReading', 'GetTemperatureReadingRequest', '')
+	}
 
 private void executeCommand(String method, String act, String cmd, def val){
-	def httpInfo = [
-		uri: device.getDataValue("url"),
-		path: device.getDataValue("pathStr")
+    def httpInfo = [
+        uri: device.getDataValue("url"),
+        path: device.getDataValue("pathStr")
 	]
     
-	try{
+    try{
     	if (method == "Control") {
-        	httpInfo.body = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "8ABF9885-B386-443D-8ABA-01EA780199FD", value: val]
-			log.debug httpInfo
-			httpPost(httpInfo) { resp ->
-				sendEvent(name: "state", value : resp.data.payload.state)
-				sendEvent(name: "value", value : resp.data.payload.value)
-			}
-		}
-		else {
-        	httpInfo.query = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "8ABF9885-B386-443D-8ABA-01EA780199FD"]
-			log.debug httpInfo
-			httpGet(httpInfo) { resp ->
-				sendEvent(name: "state", value : resp.data.payload.state)
-				sendEvent(name: "value", value : resp.data.payload.value)
-			}
-		}
-	} catch (e) {
-		log.error "Error creating device: ${e}"
-	}
+        	httpInfo.body = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "8ABF9885-B386-443D-8ABA-01EA780199FD", value: val ]
+            log.debug httpInfo
+            httpPost(httpInfo) { resp ->
+                sendEvent(name: "state", value : resp.data.payload.state)
+                sendEvent(name: "value", value : resp.data.payload.value)
+            }
+        }
+        else {
+        	httpInfo.query = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "8ABF9885-B386-443D-8ABA-01EA780199FD" ]
+            log.debug httpInfo
+            httpGet(httpInfo) { resp ->
+                sendEvent(name: "state", value : resp.data.payload.state)
+                sendEvent(name: "value", value : resp.data.payload.value)
+            }
+        }
+    } catch (e) {
+        log.error "Error creating device: ${e}"
+    }
 }
-
-
-
-// ************************************************************************
-
-
-metadata {
-	definition (name: "thermo-handler-device003", namespace: "MDSE", author: "AP") {
-    	attribute "state", "string"
-		attribute "value", "number"
-		command 'settargettemperatureSkill'
-		}
-
-	// simulator metadata
-	simulator {
-	}
-
-	// UI tile definitions
-	tiles(scale: 2) {
-		standardTile("Temperature", "device.value", width: 2, height: 2) {
-			state "default", label: '${currentValue}°', icon: "st.alarm.temperature.normal", backgroundColors:[
-					[value: -10, color: "#800080"],//purple
-					[value: 0, color: "#0000ff"], //blue
-					[value: 25, color: "#00ff00"],//green
-					[value: 35, color: "#ffff00"],//yellow
-					[value: 45, color: "#ffa500"],//orange			
-					[value: 60, color: "#ff0000"]//red
-			]
-		}
-
-		controlTile('settargettemperatureSkill', 'device.value', 'slider', width: 4, height: 2, inactiveLabel: false, range:'(-100..100)')
-		{
-			state 'default', label: 'settargettemperatureSkill', action: 'settargettemperatureSkill'
-		}
-		main "Temperature"
-        	details (["Temperature" , 'settargettemperatureSkill'])
-		
-	}
-}
-
-def getInitialValue(){
-	log.info "Executing getInitialValue"
-	executeCommand("Query", "GetInitialValue", "GetInitialValueRequest", "")
-}
-
-def settargettemperatureSkill(def arg)
-{
-	executeCommand('Control', 'settargettemperature', 'settargettemperatureRequest', arg)
-}
-
-private void executeCommand(String method, String act, String cmd, def val){
-	def httpInfo = [
-		uri: device.getDataValue("url"),
-		path: device.getDataValue("pathStr")
-	]
-    
-	try{
-    	if (method == "Control") {
-        	httpInfo.body = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "8ABF9885-B386-443D-8ABA-01EA780199FD", value: val]
-			log.debug httpInfo
-			httpPost(httpInfo) { resp ->
-				sendEvent(name: "state", value : resp.data.payload.state)
-				sendEvent(name: "value", value : resp.data.payload.value)
-			}
-		}
-		else {
-        	httpInfo.query = [ id : device.getName(), CallerIdentifier: "smartthing", name:cmd, action:act, messageid: "8ABF9885-B386-443D-8ABA-01EA780199FD"]
-			log.debug httpInfo
-			httpGet(httpInfo) { resp ->
-				sendEvent(name: "state", value : resp.data.payload.state)
-				sendEvent(name: "value", value : resp.data.payload.value)
-			}
-		}
-	} catch (e) {
-		log.error "Error creating device: ${e}"
-	}
-}
-
-
-
-// ************************************************************************
-
